@@ -5,6 +5,8 @@ export type ReportStatus = "open" | "claimed" | "collected" | "resolved";
 export interface Profile {
   id: string;
   full_name: string | null;
+  first_name?: string | null;   // add
+  last_name?: string | null;    // add
   role: UserRole;
   organization_name: string | null;
   phone: string | null;
