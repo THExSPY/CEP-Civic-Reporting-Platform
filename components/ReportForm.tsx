@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
@@ -16,11 +16,20 @@ async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
   return new File([blob], filename, { type: blob.type });
 }
 
-export default function ReportForm({ user }: { user: User | null }) {
+export default function ReportForm({
+  user,
+  defaultName = "",
+}: {
+  user: User | null;
+  defaultName?: string;
+}) {
   const supabase = createClient();
   const router = useRouter();
 
-  const [reporterName, setReporterName] = useState("");
+  const [reporterName, setReporterName] = useState(defaultName);
+  // Decided after mount so server and client markup match (avoids a hydration warning).
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => setIsNative(Capacitor.isNativePlatform()), []);
   const [locationDesc, setLocationDesc] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -135,60 +144,64 @@ export default function ReportForm({ user }: { user: User | null }) {
     }
 
     setSuccess(true);
-    setTimeout(() => router.push("/map"), 1200);
+    setTimeout(() => {
+      router.push("/#map");
+      router.refresh();
+    }, 1200);
   }
 
   if (success) {
     return (
-      <div className="rounded-md bg-green-50 p-4 text-green-800">
-        Thank you! Your report has been logged successfully. Redirecting to the map…
+      <div className="rounded-xl bg-green-50 p-5 text-center text-green-800">
+        <p className="text-lg font-semibold">Thank you! 🌱</p>
+        <p className="text-sm">Your report has been logged. Taking you to the map…</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="mb-1 block text-sm font-medium">
+        <label className="label">
           Your Name (Optional)
         </label>
         <input
           value={reporterName}
           onChange={(e) => setReporterName(e.target.value)}
-          className="w-full rounded-md border px-3 py-2"
+          className="input"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">
+        <label className="label">
           Location Description
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             required
             value={locationDesc}
             onChange={(e) => setLocationDesc(e.target.value)}
             placeholder="e.g. Near Deccan Gymkhana bridge"
-            className="flex-1 rounded-md border px-3 py-2"
+            className="input flex-1"
           />
           <button
             type="button"
             onClick={captureLocation}
-            className="rounded-md border px-3 py-2 text-sm"
+            className="btn-secondary shrink-0"
             title="Use my current location"
           >
-            {locating ? "…" : "📍 Use GPS"}
+            {locating ? "Locating…" : "📍 Use my location"}
           </button>
         </div>
         {coords && (
-          <p className="mt-1 text-xs text-slate-500">
-            Captured: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+          <p className="mt-1.5 text-xs text-green-700">
+            ✓ Captured: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
           </p>
         )}
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">
+        <label className="label">
           Describe the pollution or hazard
         </label>
         <textarea
@@ -196,19 +209,19 @@ export default function ReportForm({ user }: { user: User | null }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          className="w-full rounded-md border px-3 py-2"
+          className="input"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">
+        <label className="label">
           Upload a photo of the dumping site
         </label>
-        {Capacitor.isNativePlatform() ? (
+        {isNative ? (
           <button
             type="button"
             onClick={takePhoto}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            className="btn-secondary w-full"
           >
             {photo ? `✓ ${photo.name}` : "📷 Take or choose a photo"}
           </button>
@@ -217,23 +230,23 @@ export default function ReportForm({ user }: { user: User | null }) {
             type="file"
             accept="image/jpeg,image/jpg,image/png"
             onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-            className="w-full text-sm"
+            className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-river-500 file:px-3.5 file:py-2 file:text-sm file:font-semibold file:text-white"
           />
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-md bg-river-500 py-2 font-medium text-white disabled:opacity-50"
+        className="btn-primary w-full !py-3 text-base"
       >
         {submitting ? "Submitting…" : "Submit Report"}
       </button>
 
       {!user && (
-        <p className="text-xs text-slate-500">
+        <p className="text-center text-xs text-slate-500">
           Reporting anonymously. Log in to track your reports and get status updates.
         </p>
       )}

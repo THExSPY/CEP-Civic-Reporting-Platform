@@ -12,6 +12,8 @@ create type user_role as enum ('resident', 'volunteer', 'recycler', 'ngo_admin')
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
+  first_name text,
+  last_name text,
   role user_role not null default 'resident',
   organization_name text,          -- filled in for 'recycler' / 'ngo_admin' signups
   phone text,
@@ -82,13 +84,19 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name, role, organization_name)
+  insert into public.profiles (id, first_name, last_name, full_name, role, organization_name)
   values (
     new.id,
-    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'first_name',
+    new.raw_user_meta_data->>'last_name',
+    coalesce(
+      nullif(new.raw_user_meta_data->>'full_name', ''),
+      nullif(trim(concat_ws(' ', new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'last_name')), '')
+    ),
     coalesce((new.raw_user_meta_data->>'role')::user_role, 'resident'),
     new.raw_user_meta_data->>'organization_name'
-  );
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;

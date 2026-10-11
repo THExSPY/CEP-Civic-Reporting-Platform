@@ -34,31 +34,31 @@ export default function PartnerRegisterForm({ profileId }: { profileId: string }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <input
         required
         placeholder="Organization name"
         value={orgName}
         onChange={(e) => setOrgName(e.target.value)}
-        className="w-full rounded-md border px-3 py-2"
+        className="input"
       />
       <input
         placeholder="Service area, e.g. Kothrud, Karve Nagar"
         value={serviceArea}
         onChange={(e) => setServiceArea(e.target.value)}
-        className="w-full rounded-md border px-3 py-2"
+        className="input"
       />
       <input
         placeholder="Materials accepted, comma separated (plastic, e-waste, paper)"
         value={materials}
         onChange={(e) => setMaterials(e.target.value)}
-        className="w-full rounded-md border px-3 py-2"
+        className="input"
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-river-500 px-4 py-2 text-white disabled:opacity-50"
+        className="btn-primary w-full sm:w-auto"
       >
         {submitting ? "Registering…" : "Register"}
       </button>

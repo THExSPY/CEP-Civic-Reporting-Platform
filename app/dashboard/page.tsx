@@ -1,36 +1,34 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import Dashboard from "@/components/Dashboard";
+import { getSessionContext } from "@/lib/auth";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, profile } = await getSessionContext();
 
-  if (!user) redirect("/login");
+  // Only a missing *session* sends you to log in. A missing profile row is
+  // repaired in getSessionContext, so it never bounces you to the login page.
+  if (!user) redirect("/login?next=/dashboard");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) redirect("/login");
-
-  const isResponder = ["volunteer", "recycler", "ngo_admin"].includes(profile.role);
+  const role = profile?.role ?? "resident";
+  const isResponder = ["volunteer", "recycler", "ngo_admin"].includes(role);
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">
+      <h1 className="mb-1 text-2xl font-bold tracking-tight">
         {isResponder ? "Open Reports Queue" : "Your Reports"}
       </h1>
-      <p className="mb-6 text-slate-600">
+      <p className="mb-5 text-slate-600">
         {isResponder
           ? "Claim nearby reports and mark them collected once handled."
           : "Track the status of issues you've reported."}
       </p>
-      <Dashboard profile={profile} />
+      {profile ? (
+        <Dashboard profile={profile} />
+      ) : (
+        <p className="text-slate-500">
+          We couldn&apos;t load your profile just now — please refresh the page.
+        </p>
+      )}
     </div>
   );
 }
