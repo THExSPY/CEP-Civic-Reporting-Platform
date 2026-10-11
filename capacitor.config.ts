@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   // Replace this with your real Vercel URL before building the APK —
   // see README.md > "Building the Android APK".
   server: {
-    url: "https://your-app.vercel.app",
+    url: "https://thecivic.vercel.app",
     cleartext: false,
   },
   android: {

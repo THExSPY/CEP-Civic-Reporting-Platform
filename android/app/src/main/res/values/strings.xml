@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pune Civic Reporting</string>
+    <string name="title_activity_main">Pune Civic Reporting</string>
+    <string name="package_name">com.punecivic.reporting</string>
+    <string name="custom_url_scheme">com.punecivic.reporting</string>
+</resources>
