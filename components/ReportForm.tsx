@@ -6,6 +6,8 @@ import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { createClient } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/imageCompression";
+import { COMMON_TAGS } from "@/lib/tags";
 import type { User } from "@supabase/supabase-js";
 
 // Converts a Capacitor Camera dataUrl/webPath result into a File so it
@@ -35,6 +37,10 @@ export default function ReportForm({
   const [locating, setLocating] = useState(false);
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -73,20 +79,62 @@ export default function ReportForm({
     }
   }
 
+  async function handlePhotoFile(file: File | null) {
+    if (!file) {
+      setPhoto(null);
+      setPhotoPreview(null);
+      return;
+    }
+    setCompressing(true);
+    try {
+      const compressed = await compressImage(file, file.name);
+      setPhoto(compressed);
+      setPhotoPreview(URL.createObjectURL(compressed));
+    } catch (e) {
+      console.warn("Compression failed, using original:", e);
+      setPhoto(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    } finally {
+      setCompressing(false);
+    }
+  }
+
   // Native camera capture (packaged app) vs. plain file input (web).
   async function takePhoto() {
     setError(null);
     try {
       const photoResult = await Camera.getPhoto({
-        quality: 70,
+        quality: 75,
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Prompt, // lets the user choose camera or gallery
       });
       if (photoResult.dataUrl) {
-        setPhoto(await dataUrlToFile(photoResult.dataUrl, `report-${Date.now()}.jpg`));
+        setCompressing(true);
+        const rawFile = await dataUrlToFile(photoResult.dataUrl, `report-${Date.now()}.jpg`);
+        const compressed = await compressImage(rawFile, rawFile.name);
+        setPhoto(compressed);
+        setPhotoPreview(photoResult.dataUrl);
+        setCompressing(false);
       }
     } catch {
+      setCompressing(false);
       // User cancelled the camera/gallery picker — not an error worth surfacing.
+    }
+  }
+
+  function toggleTag(tagId: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+    );
+  }
+
+  function addCustomTag(e: React.KeyboardEvent | React.MouseEvent) {
+    if ("key" in e && e.key !== "Enter") return;
+    e.preventDefault();
+    const trimmed = customTag.trim();
+    if (trimmed && !selectedTags.includes(trimmed)) {
+      setSelectedTags((prev) => [...prev, trimmed]);
+      setCustomTag("");
     }
   }
 
@@ -104,11 +152,11 @@ export default function ReportForm({
     let photoUrl: string | null = null;
 
     if (photo) {
-      const fileExt = photo.name.split(".").pop();
+      const fileExt = photo.name.split(".").pop() || "jpg";
       const filePath = `${crypto.randomUUID()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from("report-photos")
-        .upload(filePath, photo);
+        .upload(filePath, photo, { contentType: "image/jpeg" });
 
       if (uploadError) {
         setError(`Photo upload failed: ${uploadError.message}`);
@@ -134,6 +182,7 @@ export default function ReportForm({
       location: `SRID=4326;POINT(${lng} ${lat})`,
       description,
       photo_url: photoUrl,
+      tags: selectedTags,
     });
 
     setSubmitting(false);
@@ -202,13 +251,57 @@ export default function ReportForm({
 
       <div>
         <label className="label">
+          Category Tags (Select all that apply)
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {COMMON_TAGS.map((t) => {
+            const isSelected = selectedTags.includes(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => toggleTag(t.id)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition border ${
+                  isSelected
+                    ? "bg-river-600 text-white border-river-600 shadow-sm"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                {isSelected ? "✓ " : "+ "}
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <input
+            type="text"
+            value={customTag}
+            onChange={(e) => setCustomTag(e.target.value)}
+            onKeyDown={addCustomTag}
+            placeholder="Add custom tag (press Enter)"
+            className="input !py-1.5 !text-xs flex-1"
+          />
+          <button
+            type="button"
+            onClick={addCustomTag}
+            className="btn-secondary !py-1.5 !px-3 text-xs shrink-0"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label className="label">
           Describe the pollution or hazard
         </label>
         <textarea
           required
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          rows={4}
+          rows={3}
+          placeholder="What kind of waste is it? Is it in the riverbed, blocking a nala, or on the road?"
           className="input"
         />
       </div>
@@ -223,15 +316,50 @@ export default function ReportForm({
             onClick={takePhoto}
             className="btn-secondary w-full"
           >
-            {photo ? `✓ ${photo.name}` : "📷 Take or choose a photo"}
+            {photo ? `✓ Photo attached` : "📷 Take or choose a photo"}
           </button>
         ) : (
           <input
             type="file"
-            accept="image/jpeg,image/jpg,image/png"
-            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={(e) => handlePhotoFile(e.target.files?.[0] ?? null)}
             className="block w-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-river-500 file:px-3.5 file:py-2 file:text-sm file:font-semibold file:text-white"
           />
+        )}
+
+        {compressing && (
+          <p className="mt-2 text-xs text-river-600 animate-pulse">
+            ⚡ Optimizing and compressing image...
+          </p>
+        )}
+
+        {photoPreview && !compressing && (
+          <div className="mt-3 relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-2 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoPreview}
+              alt="Preview"
+              className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+            />
+            <div className="text-xs text-slate-600">
+              <p className="font-semibold text-slate-800">Photo attached & compressed</p>
+              {photo && (
+                <p className="text-slate-500">
+                  Ready to upload · {Math.round(photo.size / 1024)} KB
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPhoto(null);
+                setPhotoPreview(null);
+              }}
+              className="ml-auto text-xs font-semibold text-red-600 hover:underline px-2"
+            >
+              Remove
+            </button>
+          </div>
         )}
       </div>
 
@@ -239,10 +367,10 @@ export default function ReportForm({
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || compressing}
         className="btn-primary w-full !py-3 text-base"
       >
-        {submitting ? "Submitting…" : "Submit Report"}
+        {submitting ? "Submitting…" : compressing ? "Compressing photo…" : "Submit Report"}
       </button>
 
       {!user && (

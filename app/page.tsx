@@ -37,10 +37,10 @@ export default async function HomePage() {
             Report plastic dumping and environmental hazards anywhere in Pune and
             connect directly with volunteers and recycling partners who can act on it.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/report"
-              className="btn bg-white !text-river-700 shadow-md hover:bg-river-50"
+              className="btn bg-white !text-river-700 shadow-md hover:bg-river-50 font-bold"
             >
               <PlusIcon width={18} height={18} />
               Report an Issue
@@ -50,6 +50,12 @@ export default async function HomePage() {
               className="btn border border-white/40 bg-white/10 text-white backdrop-blur hover:bg-white/20"
             >
               {user ? "Go to Dashboard" : "Log in"}
+            </Link>
+            <Link
+              href="/download"
+              className="btn border border-white/40 bg-black/20 text-white backdrop-blur hover:bg-black/30"
+            >
+              📥 Download Android APK
             </Link>
           </div>
         </div>

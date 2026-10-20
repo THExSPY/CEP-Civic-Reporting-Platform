@@ -46,11 +46,17 @@ create table reports (
   claimed_by uuid references profiles(id),  -- recycler/volunteer who picked it up
   claimed_at timestamptz,
   resolved_at timestamptz,
+  tags text[] not null default '{}',
+  proof_photo_url text,
+  proof_description text,
+  proof_submitted_at timestamptz,
+  proof_submitted_by uuid references profiles(id),
   created_at timestamptz not null default now()
 );
 
 create index reports_location_idx on reports using gist (location);
 create index reports_status_idx on reports (status);
+create index reports_tags_idx on reports using gin (tags);
 
 alter table reports enable row level security;
 
@@ -69,6 +75,33 @@ create policy "Volunteers and recyclers can claim/update status"
       select 1 from profiles
       where profiles.id = auth.uid()
       and profiles.role in ('volunteer', 'recycler', 'ngo_admin')
+    )
+  );
+
+create policy "Admins can update any report"
+  on reports for update using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+      and profiles.role = 'ngo_admin'
+    )
+  );
+
+create policy "Admins can delete reports"
+  on reports for delete using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+      and profiles.role = 'ngo_admin'
+    )
+  );
+
+create policy "Admins can update any profile"
+  on profiles for update using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+      and profiles.role = 'ngo_admin'
     )
   );
 
@@ -154,5 +187,9 @@ select
   photo_url,
   created_at,
   ST_Y(location::geometry) as lat,
-  ST_X(location::geometry) as lng
+  ST_X(location::geometry) as lng,
+  tags,
+  proof_photo_url,
+  reporter_name
 from reports;
+

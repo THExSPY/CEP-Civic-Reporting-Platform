@@ -16,12 +16,13 @@ import {
   RecycleIcon,
 } from "@/components/icons";
 
-const LINKS = [
+const BASE_LINKS = [
   { href: "/", label: "Home", Icon: HomeIcon },
   { href: "/#map", label: "Hotspot Map", Icon: MapPinIcon },
   { href: "/report", label: "Report an Issue", Icon: PlusIcon },
   { href: "/dashboard", label: "Dashboard", Icon: GridIcon },
   { href: "/partners", label: "Recycling Partners", Icon: RecycleIcon },
+  { href: "/download", label: "Download Android App", Icon: DropletIcon },
 ];
 
 export default function Navbar({
@@ -36,6 +37,13 @@ export default function Navbar({
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const greeting = `Hi, ${firstName || "there"}`;
+
+  const links = [
+    ...BASE_LINKS,
+    ...(role === "ngo_admin"
+      ? [{ href: "/admin", label: "Admin Console", Icon: GridIcon }]
+      : []),
+  ];
 
   // Close the menu whenever the page changes.
   useEffect(() => setOpen(false), [pathname]);
@@ -67,6 +75,20 @@ export default function Navbar({
           </Link>
 
           <div className="flex items-center gap-2">
+            <Link
+              href="/download"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+            >
+              📥 Android App
+            </Link>
+            {role === "ngo_admin" && (
+              <Link
+                href="/admin"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-100"
+              >
+                ⚙️ Admin
+              </Link>
+            )}
             {signedIn ? (
               <span className="max-w-[9rem] truncate rounded-full bg-river-50 px-3 py-1.5 text-sm font-medium text-river-700">
                 {greeting}
@@ -121,7 +143,7 @@ export default function Navbar({
             </div>
 
             <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-              {LINKS.map(({ href, label, Icon }) => {
+              {links.map(({ href, label, Icon }) => {
                 const active = href === pathname;
                 return (
                   <Link

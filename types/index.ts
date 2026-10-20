@@ -25,6 +25,11 @@ export interface Report {
   claimed_at: string | null;
   resolved_at: string | null;
   created_at: string;
+  tags?: string[] | null;
+  proof_photo_url?: string | null;
+  proof_description?: string | null;
+  proof_submitted_at?: string | null;
+  proof_submitted_by?: string | null;
 }
 
 // Shape returned by the `report_points` SQL view — flattened lat/lng
@@ -38,6 +43,9 @@ export interface ReportPoint {
   created_at: string;
   lat: number;
   lng: number;
+  tags?: string[] | null;
+  proof_photo_url?: string | null;
+  reporter_name?: string | null;
 }
 
 export interface RecyclingPartner {

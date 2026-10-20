@@ -14,6 +14,11 @@ const ROLE_OPTIONS: { value: UserRole; label: string; hint: string }[] = [
     label: "Recycling Partner",
     hint: "Claim reports, schedule pickups",
   },
+  {
+    value: "ngo_admin",
+    label: "NGO / Coordinator",
+    hint: "Manage reports, assign volunteers",
+  },
 ];
 
 export default function SignupPage() {
@@ -48,7 +53,8 @@ export default function SignupPage() {
           last_name: last,
           full_name: `${first} ${last}`.trim(),
           role,
-          organization_name: role === "recycler" ? orgName : null,
+          organization_name:
+            role === "recycler" || role === "ngo_admin" ? orgName.trim() || null : null,
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -169,15 +175,21 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {role === "recycler" && (
+        {(role === "recycler" || role === "ngo_admin") && (
           <div>
-            <label className="label">Organization name</label>
+            <label className="label">
+              {role === "ngo_admin" ? "NGO / Organization name" : "Recycling Company / Org name"}
+            </label>
             <input
               required
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               className="input"
-              placeholder="e.g. GreenLoop Recyclers"
+              placeholder={
+                role === "ngo_admin"
+                  ? "e.g. Swachh Pune Foundation"
+                  : "e.g. GreenLoop Recyclers"
+              }
             />
           </div>
         )}
