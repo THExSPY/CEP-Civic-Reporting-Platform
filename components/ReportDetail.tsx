@@ -29,9 +29,10 @@ export default function ReportDetail({
   const [compressing, setCompressing] = useState(false);
   const [showProofForm, setShowProofForm] = useState(false);
 
-  const isAdmin = profile?.role === "ngo_admin";
+  const isAdmin = profile?.role === "admin" || profile?.role === "ngo_admin";
+  const isNGO = profile?.role === "ngo";
   const isResponder =
-    profile?.role === "volunteer" || profile?.role === "recycler" || isAdmin;
+    profile?.role === "volunteer" || profile?.role === "recycler" || isNGO || isAdmin;
   const isClaimant = profile && report?.claimed_by === profile.id;
   const isReporter = profile && report?.reporter_id === profile.id;
 
@@ -402,8 +403,8 @@ export default function ReportDetail({
             </div>
           )}
 
-          {/* Section: Review and Verify (For Reporter or Admin) */}
-          {report.status === "collected" && (isReporter || isAdmin) && (
+          {/* Section: Review and Verify (For Reporter, NGO, or Admin) */}
+          {report.status === "collected" && (isReporter || isNGO || isAdmin) && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-2">
               <p className="font-bold text-blue-900 text-sm">Review Cleanup</p>
               <p className="text-xs text-blue-700">

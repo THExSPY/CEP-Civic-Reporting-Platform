@@ -4,29 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { DropletIcon } from "@/components/icons";
-import type { UserRole } from "@/types";
-
-const ROLE_OPTIONS: { value: UserRole; label: string; hint: string }[] = [
-  { value: "resident", label: "Resident", hint: "Report issues near you" },
-  { value: "volunteer", label: "Volunteer", hint: "Help with cleanup drives" },
-  {
-    value: "recycler",
-    label: "Recycling Partner",
-    hint: "Claim reports, schedule pickups",
-  },
-  {
-    value: "ngo_admin",
-    label: "NGO / Coordinator",
-    hint: "Manage reports, assign volunteers",
-  },
-];
 
 export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("resident");
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,9 +24,8 @@ export default function SignupPage() {
     const first = firstName.trim();
     const last = lastName.trim();
 
-    // Pass profile fields as user metadata — a database trigger (see
-    // supabase/schema.sql) reads this and creates the `profiles` row
-    // server-side, which works whether or not email confirmation is on.
+    // All public signups start strictly as Citizen ('resident').
+    // Platform Admins assign Volunteer, NGO, or Recycler roles via the Admin Console.
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -52,9 +34,8 @@ export default function SignupPage() {
           first_name: first,
           last_name: last,
           full_name: `${first} ${last}`.trim(),
-          role,
-          organization_name:
-            role === "recycler" || role === "ngo_admin" ? orgName.trim() || null : null,
+          role: "resident",
+          organization_name: orgName.trim() || null,
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -77,9 +58,9 @@ export default function SignupPage() {
           ✉️
         </span>
         <h1 className="mb-2 text-xl font-bold">Check your inbox</h1>
-        <p className="text-slate-600">
+        <p className="text-slate-600 text-sm">
           We sent a confirmation link to <strong>{email}</strong>. Tap it to
-          confirm your email, then come back and log in.
+          confirm your email, then log in to start reporting.
         </p>
         <Link href="/login" className="btn-primary mt-6 w-full">
           Go to log in
@@ -104,7 +85,6 @@ export default function SignupPage() {
             <label className="label">First name</label>
             <input
               required
-              autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               className="input"
@@ -114,13 +94,13 @@ export default function SignupPage() {
             <label className="label">Last name</label>
             <input
               required
-              autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               className="input"
             />
           </div>
         </div>
+
         <div>
           <label className="label">Email</label>
           <input
@@ -132,6 +112,7 @@ export default function SignupPage() {
             className="input"
           />
         </div>
+
         <div>
           <label className="label">Password</label>
           <input
@@ -147,56 +128,24 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <label className="label">I am a…</label>
-          <div className="grid grid-cols-1 gap-2">
-            {ROLE_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`flex min-h-[52px] cursor-pointer items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition ${
-                  role === opt.value
-                    ? "border-river-500 bg-river-50 ring-2 ring-river-500/15"
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <span>
-                  <span className="block font-medium">{opt.label}</span>
-                  <span className="block text-xs text-slate-500">{opt.hint}</span>
-                </span>
-                <input
-                  type="radio"
-                  name="role"
-                  value={opt.value}
-                  checked={role === opt.value}
-                  onChange={() => setRole(opt.value)}
-                  className="h-4 w-4 accent-[#0e7490]"
-                />
-              </label>
-            ))}
-          </div>
+          <label className="label">
+            NGO / Volunteer Group / Company <span className="font-normal text-slate-400">(Optional)</span>
+          </label>
+          <input
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            placeholder="e.g. Swachh Pune, GreenLoop Recyclers"
+            className="input"
+          />
+          <p className="mt-1 text-[11px] text-slate-400 leading-tight">
+            All signups start as Citizens. An administrator will review your affiliation to grant Volunteer or NGO access.
+          </p>
         </div>
 
-        {(role === "recycler" || role === "ngo_admin") && (
-          <div>
-            <label className="label">
-              {role === "ngo_admin" ? "NGO / Organization name" : "Recycling Company / Org name"}
-            </label>
-            <input
-              required
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              className="input"
-              placeholder={
-                role === "ngo_admin"
-                  ? "e.g. Swachh Pune Foundation"
-                  : "e.g. GreenLoop Recyclers"
-              }
-            />
-          </div>
-        )}
-
         {error && <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>}
-        <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? "Creating account…" : "Sign up"}
+
+        <button type="submit" disabled={loading} className="btn-primary w-full !py-3">
+          {loading ? "Creating account…" : "Create Citizen Account"}
         </button>
       </form>
 

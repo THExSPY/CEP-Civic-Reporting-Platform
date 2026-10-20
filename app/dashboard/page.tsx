@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/login?next=/dashboard");
 
   const role = profile?.role ?? "resident";
-  const isResponder = ["volunteer", "recycler", "ngo_admin"].includes(role);
+  const isResponder = ["volunteer", "recycler", "ngo", "admin", "ngo_admin"].includes(role);
 
   return (
     <div>

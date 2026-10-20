@@ -38,9 +38,11 @@ export default function Navbar({
   const pathname = usePathname();
   const greeting = `Hi, ${firstName || "there"}`;
 
+  const isAdmin = role === "admin" || role === "ngo_admin";
+
   const links = [
     ...BASE_LINKS,
-    ...(role === "ngo_admin"
+    ...(isAdmin
       ? [{ href: "/admin", label: "Admin Console", Icon: GridIcon }]
       : []),
   ];
@@ -81,7 +83,7 @@ export default function Navbar({
             >
               📥 Android App
             </Link>
-            {role === "ngo_admin" && (
+            {isAdmin && (
               <Link
                 href="/admin"
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-100"

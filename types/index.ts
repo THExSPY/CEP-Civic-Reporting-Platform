@@ -1,4 +1,4 @@
-export type UserRole = "resident" | "volunteer" | "recycler" | "ngo_admin";
+export type UserRole = "resident" | "volunteer" | "recycler" | "ngo" | "admin" | "ngo_admin";
 
 export type ReportStatus = "open" | "claimed" | "collected" | "resolved";
 

@@ -7,11 +7,38 @@ import { COMMON_TAGS, getTagStyle } from "@/lib/tags";
 import StatusBadge from "@/components/StatusBadge";
 import type { Report, Profile, UserRole, ReportStatus } from "@/types";
 
-const ALL_ROLES: { value: UserRole; label: string; desc: string }[] = [
-  { value: "resident", label: "Resident", desc: "Can submit and track civic reports" },
-  { value: "volunteer", label: "Volunteer", desc: "Can claim reports and submit cleanup proof" },
-  { value: "recycler", label: "Recycling Partner", desc: "Can claim waste batches and register services" },
-  { value: "ngo_admin", label: "NGO / Platform Admin", desc: "Full administrative access" },
+// Hierarchy: Admin -> NGOs & Partners -> Volunteers -> Citizens
+const ALL_ROLES: { value: UserRole; label: string; desc: string; badge: string }[] = [
+  {
+    value: "admin",
+    label: "👑 Platform Admin",
+    desc: "Level 1: Full system control, role management, report deletion, dead account cleanup",
+    badge: "bg-red-50 text-red-800 border-red-300",
+  },
+  {
+    value: "ngo",
+    label: "🏢 NGO / Coordinator",
+    desc: "Level 2: Coordinates cleanup drives, verifies reports, reviews proof",
+    badge: "bg-purple-50 text-purple-800 border-purple-300",
+  },
+  {
+    value: "recycler",
+    label: "♻️ Recycling Partner",
+    desc: "Level 2: Collects recyclable batches and registers processing capacity",
+    badge: "bg-blue-50 text-blue-800 border-blue-300",
+  },
+  {
+    value: "volunteer",
+    label: "🤝 Volunteer",
+    desc: "Level 3: Claims open reports and uploads field cleanup proof photos",
+    badge: "bg-green-50 text-green-800 border-green-300",
+  },
+  {
+    value: "resident",
+    label: "👤 Citizen / Resident",
+    desc: "Level 4: Reports dumping and environmental hazards across Pune",
+    badge: "bg-slate-50 text-slate-800 border-slate-200",
+  },
 ];
 
 export default function AdminDashboard({ adminProfile }: { adminProfile: Profile }) {
@@ -30,6 +57,8 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<UserRole | "all">("all");
+  const [activityFilter, setActivityFilter] = useState<"all" | "active" | "dead">("all");
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -107,10 +136,67 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
     }
   }
 
+  // Delete Dead Account
+  async function handleDeleteAccount(targetUserId: string, name: string) {
+    if (targetUserId === adminProfile.id) {
+      alert("You cannot delete your own admin account.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete the account for "${name || "Unnamed User"}"?\n\nThis removes their login credentials, profile, and authorization.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingUserId(targetUserId);
+
+    // Call secure admin deletion function
+    const { error: rpcError } = await supabase.rpc("delete_user_by_admin", {
+      target_user_id: targetUserId,
+    });
+
+    if (!rpcError) {
+      setProfiles((prev) => prev.filter((p) => p.id !== targetUserId));
+      showNotice(`Account for "${name || "User"}" was deleted permanently.`);
+    } else {
+      // Fallback: delete profile row directly if RPC is not yet applied
+      const { error: fallbackError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", targetUserId);
+
+      if (!fallbackError) {
+        setProfiles((prev) => prev.filter((p) => p.id !== targetUserId));
+        showNotice(`Profile removed. Note: To delete Auth logins, run migration 004 in Supabase.`);
+      } else {
+        showNotice(`Error deleting user: ${rpcError.message || fallbackError.message}`);
+      }
+    }
+    setDeletingUserId(null);
+  }
+
   function showNotice(msg: string) {
     setActionMessage(msg);
-    setTimeout(() => setActionMessage(null), 3500);
+    setTimeout(() => setActionMessage(null), 4000);
   }
+
+  // User activity metrics
+  const userStats = useMemo(() => {
+    const stats: Record<string, { submitted: number; claimed: number; isDead: boolean }> = {};
+    for (const p of profiles) {
+      const submitted = reports.filter((r) => r.reporter_id === p.id).length;
+      const claimed = reports.filter((r) => r.claimed_by === p.id).length;
+      stats[p.id] = {
+        submitted,
+        claimed,
+        isDead: submitted === 0 && claimed === 0,
+      };
+    }
+    return stats;
+  }, [profiles, reports]);
 
   // Filtered reports
   const filteredReports = useMemo(() => {
@@ -139,17 +225,28 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
         (p.organization_name &&
           p.organization_name.toLowerCase().includes(userSearch.toLowerCase())) ||
         p.id.toLowerCase().includes(userSearch.toLowerCase());
-      return matchRole && matchSearch;
+
+      const isDead = userStats[p.id]?.isDead;
+      const matchActivity =
+        activityFilter === "all" ||
+        (activityFilter === "dead" && isDead) ||
+        (activityFilter === "active" && !isDead);
+
+      return matchRole && matchSearch && matchActivity;
     });
-  }, [profiles, userRoleFilter, userSearch]);
+  }, [profiles, userRoleFilter, userSearch, activityFilter, userStats]);
+
+  const deadAccountsCount = useMemo(() => {
+    return profiles.filter((p) => userStats[p.id]?.isDead && p.id !== adminProfile.id).length;
+  }, [profiles, userStats, adminProfile.id]);
 
   return (
     <div className="space-y-5">
       {/* Admin Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="inline-block rounded-full bg-river-100 px-3 py-0.5 text-xs font-semibold text-river-800">
-            Admin Console · {adminProfile.full_name || "Coordinator"}
+          <span className="inline-block rounded-full bg-red-100 px-3 py-0.5 text-xs font-bold text-red-800">
+            👑 Platform Admin · {adminProfile.full_name || "Super Admin"}
           </span>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight sm:text-3xl mt-1">
             Platform Administration
@@ -166,7 +263,7 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Reports Management ({reports.length})
+            Manage Reports ({reports.length})
           </button>
           <button
             onClick={() => setActiveTab("users")}
@@ -176,7 +273,7 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            User Roles & Signups ({profiles.length})
+            Users & Roles ({profiles.length})
           </button>
         </div>
       </div>
@@ -192,7 +289,6 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
       {/* ============================================================ */}
       {activeTab === "reports" && (
         <div className="space-y-4">
-          {/* Filters Bar */}
           <div className="card !p-4 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
@@ -325,11 +421,23 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
       )}
 
       {/* ============================================================ */}
-      {/* TAB 2: USER ROLES & SIGNUPS */}
+      {/* TAB 2: USER ROLES & DEAD ACCOUNT CLEANUP */}
       {/* ============================================================ */}
       {activeTab === "users" && (
         <div className="space-y-4">
-          <div className="card !p-4">
+          {/* Hierarchy Banner */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-700 space-y-1">
+            <p className="font-bold text-slate-900 text-sm">Access Level Hierarchy</p>
+            <p className="text-slate-600">
+              <strong>1. Admin:</strong> Full system access, dead account deletion & role management ·{" "}
+              <strong>2. NGOs & Partners:</strong> Organize cleanups & approve volunteer proof ·{" "}
+              <strong>3. Volunteers:</strong> Claim open reports & upload cleanup evidence ·{" "}
+              <strong>4. Citizens:</strong> Report dumping & view live map.
+            </p>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="card !p-4 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
@@ -344,10 +452,21 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
                 className="input !py-2 text-xs sm:w-44"
               >
                 <option value="all">All Roles</option>
-                <option value="resident">Residents</option>
-                <option value="volunteer">Volunteers</option>
+                <option value="admin">Platform Admins</option>
+                <option value="ngo">NGOs</option>
                 <option value="recycler">Recyclers</option>
-                <option value="ngo_admin">NGO Admins</option>
+                <option value="volunteer">Volunteers</option>
+                <option value="resident">Citizens</option>
+              </select>
+
+              <select
+                value={activityFilter}
+                onChange={(e) => setActivityFilter(e.target.value as any)}
+                className="input !py-2 text-xs sm:w-52"
+              >
+                <option value="all">All Accounts ({profiles.length})</option>
+                <option value="active">Active Only</option>
+                <option value="dead">Dead Accounts ({deadAccountsCount})</option>
               </select>
             </div>
           </div>
@@ -360,57 +479,84 @@ export default function AdminDashboard({ adminProfile }: { adminProfile: Profile
             </div>
           ) : filteredProfiles.length === 0 ? (
             <div className="card p-10 text-center text-slate-500">
-              No user profiles match your search.
+              No user profiles match your search or filter.
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredProfiles.map((p) => (
-                <div
-                  key={p.id}
-                  className="card !p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-900 text-sm">
-                        {p.full_name || "Unnamed User"}
+              {filteredProfiles.map((p) => {
+                const stats = userStats[p.id] || { submitted: 0, claimed: 0, isDead: false };
+                const isSelf = p.id === adminProfile.id;
+                const isDeleting = deletingUserId === p.id;
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`card !p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between transition ${
+                      stats.isDead ? "bg-amber-50/20 border-amber-200/70" : ""
+                    }`}
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-bold text-slate-900 text-sm">
+                          {p.full_name || "Unnamed User"}
+                        </p>
+                        {isSelf && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                            You
+                          </span>
+                        )}
+                        {p.organization_name && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                            🏢 {p.organization_name}
+                          </span>
+                        )}
+                        {stats.isDead && !isSelf && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                            Dead Account (0 reports / 0 claims)
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-slate-400 mt-1">
+                        ID: <code className="text-[10px]">{p.id.slice(0, 10)}…</code> · Joined{" "}
+                        {new Date(p.created_at).toLocaleDateString()} · Reports:{" "}
+                        <strong className="text-slate-700">{stats.submitted}</strong> · Claimed:{" "}
+                        <strong className="text-slate-700">{stats.claimed}</strong>
                       </p>
-                      {p.organization_name && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
-                          🏢 {p.organization_name}
-                        </span>
+                    </div>
+
+                    {/* Actions: Assign Role & Delete Account */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-600">Role:</span>
+                        <select
+                          value={p.role === "ngo_admin" ? "admin" : p.role}
+                          onChange={(e) => handleUpdateRole(p.id, e.target.value as UserRole)}
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm"
+                        >
+                          {ALL_ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {!isSelf && (
+                        <button
+                          type="button"
+                          disabled={isDeleting}
+                          onClick={() => handleDeleteAccount(p.id, p.full_name || "")}
+                          className="rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 transition disabled:opacity-50"
+                          title="Permanently remove dead or unwanted user account"
+                        >
+                          {isDeleting ? "Deleting…" : "🗑️ Delete"}
+                        </button>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      User ID: <code className="text-[10px]">{p.id.slice(0, 12)}…</code> · Joined{" "}
-                      {new Date(p.created_at).toLocaleDateString()}
-                    </p>
                   </div>
-
-                  {/* Role Assignment Selector */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-600">Assign Role:</span>
-                    <select
-                      value={p.role}
-                      onChange={(e) => handleUpdateRole(p.id, e.target.value as UserRole)}
-                      className={`rounded-xl border px-3 py-1.5 text-xs font-bold shadow-sm ${
-                        p.role === "ngo_admin"
-                          ? "border-purple-300 bg-purple-50 text-purple-800"
-                          : p.role === "volunteer"
-                          ? "border-green-300 bg-green-50 text-green-800"
-                          : p.role === "recycler"
-                          ? "border-blue-300 bg-blue-50 text-blue-800"
-                          : "border-slate-200 bg-white text-slate-800"
-                      }`}
-                    >
-                      {ALL_ROLES.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

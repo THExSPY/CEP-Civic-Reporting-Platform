@@ -14,8 +14,10 @@ export default async function AdminPage() {
     redirect("/login?next=/admin");
   }
 
+  const isAdmin = profile?.role === "admin" || profile?.role === "ngo_admin";
+
   // Check if user has admin privileges
-  if (profile?.role !== "ngo_admin") {
+  if (!isAdmin) {
     return (
       <div className="mx-auto max-w-md pt-8 text-center space-y-4">
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-2xl">
@@ -30,16 +32,16 @@ export default async function AdminPage() {
             {profile?.role || "resident"}
           </span>
           . The Admin Console is restricted to users with the{" "}
-          <strong>NGO / Platform Admin</strong> role.
+          <strong>Platform Admin</strong> role.
         </p>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-left text-slate-600 space-y-2">
-          <p className="font-semibold text-slate-800">Need admin access?</p>
+          <p className="font-semibold text-slate-800">Need platform admin access?</p>
           <p>
-            An existing administrator can grant you the <code>ngo_admin</code> role from their User Roles tab, or you can update your role in the Supabase SQL Editor:
+            An existing administrator can grant you the <code>admin</code> role from their User Roles tab, or you can update your role in the Supabase SQL Editor:
           </p>
           <pre className="rounded bg-slate-200/70 p-2 font-mono text-[11px] overflow-x-auto">
-            {`UPDATE profiles SET role = 'ngo_admin' WHERE id = '${user.id}';`}
+            {`UPDATE profiles SET role = 'admin' WHERE id = '${user.id}';`}
           </pre>
         </div>
 

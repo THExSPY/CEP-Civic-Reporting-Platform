@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, UserRole } from "@/types";
 
-const ROLES: UserRole[] = ["resident", "volunteer", "recycler", "ngo_admin"];
+const ROLES: UserRole[] = ["resident", "volunteer", "recycler", "ngo", "admin", "ngo_admin"];
 
 /**
  * Current user + profile for this request (memoised, so the layout and the

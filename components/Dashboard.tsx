@@ -16,7 +16,7 @@ export default function Dashboard({ profile }: { profile: Profile }) {
   const [tagFilter, setTagFilter] = useState<string>("all");
 
   const isResponder =
-    profile.role === "volunteer" || profile.role === "recycler" || profile.role === "ngo_admin";
+    ["volunteer", "recycler", "ngo", "admin", "ngo_admin"].includes(profile.role);
 
   useEffect(() => {
     async function load() {
